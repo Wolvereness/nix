@@ -1,4 +1,5 @@
 use super::{ffi, consts, GetSockOpt, SetSockOpt};
+use libc;
 use {Errno, Result};
 use sys::time::TimeVal;
 use libc::{c_int, uint8_t, c_void, socklen_t};
@@ -176,6 +177,7 @@ sockopt_impl!(GetOnly, SockType, consts::SOL_SOCKET, consts::SO_TYPE, super::Soc
 sockopt_impl!(GetOnly, AcceptConn, consts::SOL_SOCKET, consts::SO_ACCEPTCONN, bool);
 #[cfg(target_os = "linux")]
 sockopt_impl!(GetOnly, OriginalDst, consts::SOL_IP, consts::SO_ORIGINAL_DST, sockaddr_in);
+sockopt_impl!(Both, ReceiveTimestamp, libc::SOL_SOCKET, libc::SO_TIMESTAMP, bool);
 
 /*
  *

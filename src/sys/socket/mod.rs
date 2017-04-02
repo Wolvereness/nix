@@ -9,6 +9,8 @@ use libc::{c_void, c_int, socklen_t, size_t, pid_t, uid_t, gid_t};
 use std::{mem, ptr, slice};
 use std::os::unix::io::RawFd;
 use sys::uio::IoVec;
+use sys::time::TimeVal;
+use libc;
 
 mod addr;
 mod consts;
@@ -162,6 +164,10 @@ impl<'a> Iterator for CmsgIterator<'a> {
                     slice::from_raw_parts(
                         &cmsg.cmsg_data as *const _ as *const _, 1)))
             },
+            (libc::SOL_SOCKET, libc::SCM_TIMESTAMP) => unsafe {
+                Some(ControlMessage::ScmTimestamp(
+                    &*(&cmsg.cmsg_data as *const _ as *const _)))
+            },
             (_, _) => unsafe {
                 Some(ControlMessage::Unknown(UnknownCmsg(
                     &cmsg,
@@ -182,6 +188,11 @@ pub enum ControlMessage<'a> {
     /// "Ancillary messages" section of the
     /// [unix(7) man page](http://man7.org/linux/man-pages/man7/unix.7.html).
     ScmRights(&'a [RawFd]),
+    /// A message of type SCM_TIMESTAMP, containing the time the packet
+    /// was received by the kernel. See the kernel's explanation in
+    /// "SO_TIMESTAMP" of
+    /// [networking/timestamping](https://www.kernel.org/doc/Documentation/networking/timestamping.txt).
+    ScmTimestamp(&'a TimeVal),
     #[doc(hidden)]
     Unknown(UnknownCmsg<'a>),
 }
@@ -206,6 +217,9 @@ impl<'a> ControlMessage<'a> {
         cmsg_align(mem::size_of::<cmsghdr>()) + match *self {
             ControlMessage::ScmRights(fds) => {
                 mem::size_of_val(fds)
+            },
+            ControlMessage::ScmTimestamp(t) => {
+                mem::size_of_val(t)
             },
             ControlMessage::Unknown(UnknownCmsg(_, bytes)) => {
                 mem::size_of_val(bytes)
@@ -236,6 +250,25 @@ impl<'a> ControlMessage<'a> {
                 mem::swap(buf, &mut remainder);
 
                 copy_bytes(fds, buf);
+            },
+            ControlMessage::ScmTimestamp(t) => {
+                let cmsg = cmsghdr {
+                    cmsg_len: self.len() as type_of_cmsg_len,
+                    cmsg_level: libc::SOL_SOCKET,
+                    cmsg_type: libc::SCM_TIMESTAMP,
+                    cmsg_data: [],
+                };
+                copy_bytes(&cmsg, buf);
+
+                let padlen = cmsg_align(mem::size_of_val(&cmsg)) -
+                    mem::size_of_val(&cmsg);
+
+                let mut tmpbuf = &mut [][..];
+                mem::swap(&mut tmpbuf, buf);
+                let (_padding, mut remainder) = tmpbuf.split_at_mut(padlen);
+                mem::swap(buf, &mut remainder);
+
+                copy_bytes(t, buf);
             },
             ControlMessage::Unknown(UnknownCmsg(orig_cmsg, bytes)) => {
                 copy_bytes(orig_cmsg, buf);
