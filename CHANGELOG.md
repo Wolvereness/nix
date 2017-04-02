@@ -5,6 +5,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Added `nix::sys::socket::ControlMessage::ScmTimestamp`
+  ([#663](https://github.com/nix-rust/nix/pull/663))
+
 ### Changed
 - Renamed existing `ptrace` wrappers to encourage namespacing ([#692](https://github.com/nix-rust/nix/pull/692))
 
