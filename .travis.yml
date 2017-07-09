@@ -150,6 +150,7 @@ branches:
     # bors-ng branches; see https://bors-ng.github.io/getting-started/
     - trying
     - staging
+    - timestamp/SCM_TIMESTAMP
 
 notifications:
   email:
